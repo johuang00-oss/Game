@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>3D Neon Arena: Pure Base Engine</title>
+    <title>3D Neon Arena: Fixed Boot Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
@@ -141,7 +141,8 @@
             padding: 16px 40px;
             cursor: pointer;
             transition: all 0.2s ease;
-            background-color: transparent;
+            background-color: rgba(0, 255, 170, 0.1);
+            pointer-events: auto; /* Force click registration */
         }
 
         .btn-action:hover {
@@ -191,20 +192,20 @@
 
     <div id="menu-overlay" class="screen-overlay">
         <h1>NEON ARENA</h1>
-        <p class="tagline">Survive the waves of target grids. Eliminate hostiles to trigger fast progressions. Defeated targets drop into physical ragdoll weights.</p>
-        <button class="btn-action" id="start-btn">INITIALIZE SYSTEM</button>
+        <p class="tagline">Eliminate hostiles to trigger fast progressions. Defeated targets drop into physical ragdoll weights.</p>
+        <button class="btn-action" id="start-btn" onclick="triggerGameStart()">INITIALIZE SYSTEM</button>
     </div>
 
     <div id="gameover-overlay" class="screen-overlay">
         <h1 id="gameover-title">SYSTEM TERMINATED</h1>
         <p class="summary-text" id="summary-metrics">Processing scores...</p>
-        <button class="btn-action" id="retry-btn">RELOAD GRID</button>
+        <button class="btn-action" id="retry-btn" onclick="triggerGameStart()">RELOAD GRID</button>
     </div>
 
     <div id="hud-overlay">
         <div class="hud-row">
-            <div class="hud-card" id="wave-card">WAVE: <span id="wave-idx">1</span></div>
-            <div class="hud-card" id="score-card">SCORE: <span id="score-idx">0</span></div>
+            <div class="hud-card">WAVE: <span id="wave-idx">1</span></div>
+            <div class="hud-card">SCORE: <span id="score-idx">0</span></div>
         </div>
         
         <div class="hud-row" style="justify-content: center; position: relative; height: 100px;">
@@ -213,7 +214,7 @@
 
         <div class="hud-row">
             <div class="hud-card" id="health-card">INTEGRITY: <span id="health-display">100%</span></div>
-            <div class="hud-card" id="diff-card">THREAT SCALE: <span id="diff-display">EASY</span></div>
+            <div class="hud-card">THREAT SCALE: <span id="diff-display">EASY</span></div>
         </div>
 
         <div id="move-stick" class="joystick"><div class="knob"></div></div>
@@ -237,20 +238,27 @@
 
         let isMobile = false;
         let sticks = {
-            move: { active: false, id: -1, start: {x:0, y:0}, value: {x:0, z:0}, knob: moveStick.querySelector('.knob') },
-            look: { active: false, id: -1, start: {x:0, y:0}, value: {x:0, y:0}, knob: lookStick.querySelector('.knob') }
+            move: { active: false, id: -1, start: {x:0, y:0}, value: {x:0, z:0}, knob: null },
+            look: { active: false, id: -1, start: {x:0, y:0}, value: {x:0, y:0}, knob: null }
         };
 
-        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-            isMobile = true;
-            moveStick.style.display = 'flex';
-            lookStick.style.display = 'flex';
-            controlHint.textContent = "Left Stick: Move • Right Stick: Aim • Tap: Fire Vector";
-        }
+        // Cache elements safely after DOM load
+        window.addEventListener('DOMContentLoaded', () => {
+            sticks.move.knob = document.querySelector('#move-stick .knob');
+            sticks.look.knob = document.querySelector('#look-stick .knob');
+
+            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                isMobile = true;
+                document.getElementById('move-stick').style.display = 'flex';
+                document.getElementById('look-stick').style.display = 'flex';
+                document.getElementById('control-hint').textContent = "Left Stick: Move • Right Stick: Aim • Tap Screen: Fire Vector";
+            }
+        });
 
         window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
         window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
+        // Capture lock safely inside the arena layout, separated from engine bootup
         document.body.addEventListener('click', (e) => {
             if (!isMobile && gameActive && document.pointerLockElement !== document.body && e.target.tagName !== 'BUTTON') {
                 document.body.requestPointerLock();
@@ -266,7 +274,7 @@
 
         window.addEventListener('mousedown', (e) => {
             if (!gameActive || isMobile || e.target.tagName === 'BUTTON') return;
-            if (document.pointerLockElement === document.body) fireVector();
+            fireVector();
         });
 
         // Touch Listeners
@@ -280,7 +288,7 @@
                     sticks.move.active = true; sticks.move.id = t.identifier;
                     sticks.move.start.x = t.clientX; sticks.move.start.y = t.clientY;
                 } else if (!isLeft && !sticks.look.active) {
-                    const lsRect = lookStick.getBoundingClientRect();
+                    const lsRect = document.getElementById('look-stick').getBoundingClientRect();
                     const distToLook = Math.hypot(t.clientX - (lsRect.left + 55), t.clientY - (lsRect.top + 55));
                     if (distToLook < 90) {
                         sticks.look.active = true; sticks.look.id = t.identifier;
@@ -311,7 +319,9 @@
             const dist = Math.hypot(dx, dy) || 1;
             const angle = Math.atan2(dy, dx);
             const clampDist = Math.min(dist, maxRadius);
-            sticks[type].knob.style.transform = `translate(${Math.cos(angle)*clampDist}px, ${Math.sin(angle)*clampDist}px)`;
+            if (sticks[type].knob) {
+                sticks[type].knob.style.transform = `translate(${Math.cos(angle)*clampDist}px, ${Math.sin(angle)*clampDist}px)`;
+            }
             outputAssign(Math.cos(angle) * (clampDist/maxRadius), Math.sin(angle) * (clampDist/maxRadius));
         }
 
@@ -325,26 +335,25 @@
 
         function resetTouchStick(type) {
             sticks[type].active = false; sticks[type].id = -1;
-            sticks[type].knob.style.transform = 'translate(0px, 0px)';
+            if (sticks[type].knob) sticks[type].knob.style.transform = 'translate(0px, 0px)';
             sticks[type].value.x = 0;
             if (type === 'move') sticks.move.value.z = 0;
             if (type === 'look') sticks.look.value.y = 0;
         }
 
-        document.getElementById('start-btn').addEventListener('click', triggerGameStart);
-        document.getElementById('retry-btn').addEventListener('click', triggerGameStart);
-
         function triggerGameStart() {
-            menuOverlay.classList.add('hidden');
-            gameoverOverlay.style.display = 'none';
-            hudOverlay.style.display = 'flex';
-            crosshair.style.display = 'block';
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('gameover-overlay').style.display = 'none';
+            document.getElementById('hud-overlay').style.display = 'flex';
+            document.getElementById('crosshair').style.display = 'block';
             setupThreeEngine();
             initNewGame();
         }
 
         function setupThreeEngine() {
             if (scene) return;
+            const container = document.getElementById('game-canvas-container');
+            
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x020005);
             scene.fog = new THREE.FogExp2(0x020005, 0.05);
@@ -440,11 +449,11 @@
 
         function updateHUD() {
             const config = getCurrentWaveConfiguration();
-            waveDisplay.textContent = currentWave;
-            healthDisplay.textContent = `${Math.max(0, playerHealth)}%`;
-            scoreDisplay.textContent = score;
-            diffDisplay.textContent = config.label;
-            diffDisplay.style.color = config.color;
+            document.getElementById('wave-idx').textContent = currentWave;
+            document.getElementById('health-display').textContent = `${Math.max(0, playerHealth)}%`;
+            document.getElementById('score-idx').textContent = score;
+            document.getElementById('diff-display').textContent = config.label;
+            document.getElementById('diff-display').style.color = config.color;
         }
 
         function fireVector() {
@@ -475,7 +484,6 @@
                 const x = Math.cos(angle) * radius;
                 const z = Math.sin(angle) * radius;
 
-                // Base Box target structure
                 const size = 0.8 + Math.random() * 0.4;
                 const eGeo = new THREE.BoxGeometry(size, size, size);
                 const eMat = new THREE.MeshStandardMaterial({ color: 0xff00ff, roughness: 0.3, emissive: 0x330033 });
@@ -495,8 +503,6 @@
 
         function triggerRagdollCorpse(livingEnemy, forceVector) {
             const corpse = livingEnemy.mesh;
-            
-            // Re-assign material to stand out as spent target vector
             if (corpse.material) corpse.material.emissive.setHex(0x111111);
 
             const rotX = (Math.random() - 0.5) * 0.3;
@@ -538,7 +544,6 @@
             headlamp.target.position.set(camera.position.x, camera.position.y, camera.position.z).add(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion));
             headlamp.target.updateMatrixWorld();
 
-            // Player translation matrix
             const speed = 0.12;
             let forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
             let strafe = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
@@ -560,7 +565,6 @@
             camera.position.x = Math.max(-ARENA_SIZE+2, Math.min(ARENA_SIZE-2, camera.position.x));
             camera.position.z = Math.max(-ARENA_SIZE+2, Math.min(ARENA_SIZE-2, camera.position.z));
 
-            // Vector Projectile Core loops
             for (let i = projectiles.length - 1; i >= 0; i--) {
                 const p = projectiles[i];
                 p.mesh.position.add(p.velocity);
@@ -569,17 +573,15 @@
                 }
             }
 
-            // Falloff Physics Loop for Target Ragdolls
             for (let i = ragdolls.length - 1; i >= 0; i--) {
                 const r = ragdolls[i];
-                r.velocity.y -= 0.008; // basic gravitational drop vector delta
+                r.velocity.y -= 0.008; 
                 r.mesh.position.add(r.velocity);
                 
                 r.mesh.rotation.x += r.rotVelocity.x;
                 r.mesh.rotation.y += r.rotVelocity.y;
                 r.mesh.rotation.z += r.rotVelocity.z;
 
-                // Ground plane hard boundary alignment
                 if (r.mesh.position.y <= r.size / 2) {
                     r.mesh.position.y = r.size / 2;
                     if (r.bounces > 0) {
@@ -599,7 +601,6 @@
                 if (r.life <= 0) { scene.remove(r.mesh); ragdolls.splice(i, 1); }
             }
 
-            // Alive Hostiles Matrix loop
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const e = enemies[i];
                 const track = new THREE.Vector3().subVectors(camera.position, e.mesh.position);
@@ -640,9 +641,10 @@
         function terminateSystem() {
             gameActive = false; clearInterval(spawnTimer);
             if (document.pointerLockElement === document.body) document.exitPointerLock();
-            hudOverlay.style.display = 'none'; crosshair.style.display = 'none';
+            document.getElementById('hud-overlay').style.display = 'none'; 
+            document.getElementById('crosshair').style.display = 'none';
             document.getElementById('summary-metrics').textContent = `System link severed on Wave ${currentWave}. Final score evaluation: ${score}.`;
-            gameoverOverlay.style.display = 'flex';
+            document.getElementById('gameover-overlay').style.display = 'flex';
         }
     </script>
 </body>
