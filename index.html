@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Survival Wave Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Mobile Survival Wave Game</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
     <style>
-        /* Custom Properties for easy theme management */
         :root {
             --bg-color: #0d0f12;
             --container-bg: #161a22;
@@ -18,13 +19,17 @@
             --text-main: #f0f2f5;
             --text-muted: #8a99ad;
             --border-color: #262c3a;
+            --player-color: #3effbe;
         }
 
-        /* Reset & Base Styles */
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            /* Prevent accidental double-tap zoom or long-press selections on mobile devices */
+            touch-action: none;
+            -webkit-touch-callout: none;
+            user-select: none;
         }
 
         body {
@@ -35,68 +40,46 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
-            overflow-x: hidden;
-            /* Subtle background grid pattern for a tech/game feel */
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-            background-size: 40px 40px;
+            padding: 10px;
+            overflow: hidden;
         }
 
-        /* Centered Container Box */
         .container {
             background-color: var(--container-bg);
             border: 1px solid var(--border-color);
             border-radius: 16px;
-            padding: 40px 30px;
-            max-width: 550px;
+            padding: 30px 20px;
+            max-width: 750px;
             width: 100%;
             text-align: center;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 
-                        0 0 50px rgba(255, 62, 62, 0.05);
-            backdrop-filter: blur(8px);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            position: relative;
         }
 
-        .container:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), 
-                        0 0 60px rgba(255, 62, 62, 0.1);
-        }
-
-        /* Main Header */
         h1 {
             font-family: 'Orbitron', sans-serif;
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 2px;
-            line-height: 1.2;
             margin-bottom: 15px;
-            color: var(--text-main);
-            /* Crimson neon glow effect */
-            text-shadow: 0 0 10px var(--accent-glow), 0 0 20px var(--accent-glow);
+            text-shadow: 0 0 10px var(--accent-glow);
         }
 
-        /* Tagline / Subtitle */
         .tagline {
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: var(--text-muted);
-            margin-bottom: 30px;
-            font-weight: 400;
+            margin-bottom: 25px;
         }
 
-        /* Game Stats / Features Preview */
         .game-meta {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 35px;
+            gap: 10px;
+            margin-bottom: 25px;
             background: rgba(0, 0, 0, 0.2);
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.03);
         }
 
         .stat-box {
@@ -106,86 +89,386 @@
         }
 
         .stat-label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
             color: var(--text-muted);
         }
 
         .stat-value {
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: 700;
             color: var(--accent-color);
         }
 
-        /* Call to Action Button */
         .btn-play {
-            display: inline-block;
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
             color: #ffffff;
             background-color: var(--accent-color);
             border: none;
             border-radius: 8px;
-            padding: 16px 40px;
+            padding: 14px 30px;
             cursor: pointer;
             width: 100%;
             box-shadow: 0 4px 15px var(--accent-glow);
-            transition: all 0.2s ease;
         }
 
-        .btn-play:hover {
-            background-color: #ff5757;
-            box-shadow: 0 6px 25px rgba(255, 62, 62, 0.6);
-            transform: scale(1.02);
+        /* Game Screen Layout */
+        #game-screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            position: relative;
         }
 
-        .btn-play:active {
-            transform: scale(0.98);
+        .game-ui {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 10px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
         }
 
-        /* Responsive adjustments */
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 2rem;
-            }
-            .container {
-                padding: 30px 20px;
-            }
-            .game-meta {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
+        .ui-element {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
         }
+
+        .ui-element span {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        #health-display {
+            color: var(--player-color) !important;
+        }
+
+        #canvas-container {
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+        }
+
+        #canvas-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 15, 18, 0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #overlay-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.2rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+
+        /* Virtual Mobile Touch Joystick styles */
+        #joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: none; /* Only reveals via JS detection */
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            backdrop-filter: blur(4px);
+        }
+
+        #joystick-knob {
+            width: 36px;
+            height: 36px;
+            background: var(--player-color);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--player-color);
+            transition: transform 0.05s linear;
+        }
+
+        .instructions {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Welcome to Survival Game</h1>
-        <p class="tagline">The waves are coming. How long will you stand against the endless crimson tide?</p>
-        
-        <div class="game-meta">
-            <div class="stat-box">
-                <span class="stat-label">Game Mode</span>
-                <span class="stat-value">Wave Survival</span>
+    <div class="container" id="main-container">
+        <div id="menu-screen">
+            <h1>Survival Game</h1>
+            <p class="tagline">The waves are coming. Cross-platform 3D action optimized for mobile touch & desktop.</p>
+            
+            <div class="game-meta">
+                <div class="stat-box">
+                    <span class="stat-label">Controls</span>
+                    <span class="stat-value" style="color: var(--player-color)">Touch / WASD</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Mobile</span>
+                    <span class="stat-value" style="color: #a855f7">Joystick UI</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Engine</span>
+                    <span class="stat-value">Three.js</span>
+                </div>
             </div>
-            <div class="stat-box">
-                <span class="stat-label">Difficulty</span>
-                <span class="stat-value">Hardcore</span>
-            </div>
-            <div class="stat-box">
-                <span class="stat-label">Current Version</span>
-                <span class="stat-value">v1.0.4</span>
-            </div>
+
+            <button class="btn-play" id="start-btn">Enter the Arena</button>
         </div>
 
-        <button class="btn-play">Enter the Arena</button>
+        <div id="game-screen">
+            <div class="game-ui">
+                <div class="ui-element">Wave: <span id="wave-idx">1</span></div>
+                <div class="ui-element">HP: <span id="health-display">100</span></div>
+                <div class="ui-element">Score: <span id="score-idx">0</span></div>
+            </div>
+            
+            <div id="canvas-container">
+                <div id="canvas-overlay">
+                    <h2 id="overlay-title">GAME OVER</h2>
+                    <p id="overlay-text">Summary metrics show up here.</p>
+                    <button class="btn-play" id="retry-btn" style="width: auto; margin-top: 15px; padding: 10px 25px;">Play Again</button>
+                </div>
+
+                <div id="joystick-zone">
+                    <div id="joystick-knob"></div>
+                </div>
+            </div>
+            
+            <p class="instructions" id="control-text">Move: Left Stick. Shoot: Tap anywhere on the right side arena grid.</p>
+        </div>
     </div>
 
-</body>
-</html>
+    <script>
+        // DOM Elements
+        const startBtn = document.getElementById('start-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const menuScreen = document.getElementById('menu-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const canvasContainer = document.getElementById('canvas-container');
+        const canvasOverlay = document.getElementById('canvas-overlay');
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+        const controlText = document.getElementById('control-text');
+        
+        const waveDisplay = document.getElementById('wave-idx');
+        const healthDisplay = document.getElementById('health-display');
+        const scoreDisplay = document.getElementById('score-idx');
+
+        // Three.js Core Variables
+        let scene, camera, renderer, playerObj;
+        
+        // Game Lists & Logic Tracking
+        let projectiles = []; let enemies = []; let particles = [];
+        let keys = {}; let gameActive = false;
+        let currentWave = 1; let score = 0; let playerHealth = 100;
+        let spawnTimer;
+
+        const ARENA_SIZE = 30;
+
+        // Mobile Touch Joystick Tracking Metrics
+        let isMobile = false;
+        let joystickActive = false;
+        let joystickStart = { x: 0, y: 0 };
+        let joystickMove = { x: 0, y: 0 };
+        let moveVector = new THREE.Vector3(0, 0, 0); // Stores touch-calculated speeds
+
+        // Raycasting components for aiming mechanics
+        const raycaster = new THREE.Raycaster();
+        const pointer2D = new THREE.Vector2();
+        const planeTarget = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+        // Detect Touch Capability Interface
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            isMobile = true;
+            joystickZone.style.display = 'flex';
+            controlText.textContent = "Move: Drag the Virtual Joystick. Shoot: Tap anywhere else on screen.";
+        }
+
+        // Desktop Keyboard Listeners
+        window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        // Unified Interaction Handlers (Mice + Touch screens)
+        function updatePointerCoordinates(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer2D.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            pointer2D.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        window.addEventListener('mousemove', e => {
+            if (isMobile) return;
+            updatePointerCoordinates(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (!gameActive || isMobile || e.target.tagName === 'BUTTON') return;
+            fireProjectile();
+        });
+
+        // Mobile Touch Input Tracing Logic
+        canvasContainer.addEventListener('touchstart', e => {
+            if (!gameActive) return;
+            
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const rect = joystickZone.getBoundingClientRect();
+                
+                // Check if the touch event occurs within or near the active joystick perimeter circle
+                const distToJoystick = Math.hypot(
+                    touch.clientX - (rect.left + rect.width/2),
+                    touch.clientY - (rect.top + rect.height/2)
+                );
+
+                if (distToJoystick < rect.width * 0.9 && !joystickActive) {
+                    joystickActive = true;
+                    joystickStart.x = touch.clientX;
+                    joystickStart.y = touch.clientY;
+                } else if (e.target.tagName !== 'BUTTON') {
+                    // Treat any other tap outside the joystick as a targeted shot command
+                    updatePointerCoordinates(touch.clientX, touch.clientY);
+                    fireProjectile();
+                }
+            }
+        }, { passive: true });
+
+        canvasContainer.addEventListener('touchmove', e => {
+            if (!gameActive || !joystickActive) return;
+
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+                // Process coordinates relative to joystick center origins
+                const dx = touch.clientX - joystickStart.x;
+                const dy = touch.clientY - joystickStart.y;
+                const distance = Math.hypot(dx, dy);
+                const maxRadius = 45; // Max knob drag bounds limit
+
+                if (distance > 0) {
+                    const angle = Math.atan2(dy, dx);
+                    const clampedDist = Math.min(distance, maxRadius);
+                    
+                    const knobX = Math.cos(angle) * clampedDist;
+                    const knobY = Math.sin(angle) * clampedDist;
+                    
+                    joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+                    
+                    // Assign fractional values into operational tracking directional vector
+                    moveVector.x = Math.cos(angle) * (clampedDist / maxRadius);
+                    moveVector.z = Math.sin(angle) * (clampedDist / maxRadius);
+                }
+            }
+        }, { passive: true });
+
+        canvasContainer.addEventListener('touchend', () => {
+            joystickActive = false;
+            joystickKnob.style.transform = `translate(0px, 0px)`;
+            moveVector.set(0, 0, 0); // Reset translation speed back to baseline zero
+        });
+
+        // Start Call-to-actions
+        startBtn.addEventListener('click', () => {
+            menuScreen.classList.add('hidden');
+            gameScreen.style.display = 'flex';
+            setupThreeEngine();
+            initNewGame();
+        });
+
+        retryBtn.addEventListener('click', () => {
+            canvasOverlay.style.display = 'none';
+            initNewGame();
+        });
+
+        function setupThreeEngine() {
+            if (scene) return;
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x08090c);
+            scene.fog = new THREE.FogExp2(0x08090c, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, 16/10, 0.1, 1000);
+            camera.position.set(0, 22, 16);
+            camera.lookAt(0, 0, -2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            const rect = canvasContainer.getBoundingClientRect();
+            renderer.setSize(rect.width, rect.width * (10/16));
+            canvasContainer.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
+
+            const gridHelper = new THREE.GridHelper(ARENA_SIZE * 2, 30, 0x262c3a, 0x161a22);
+            gridHelper.position.y = -0.49;
+            scene.add(gridHelper);
+
+            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.2, ARENA_SIZE * 2);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: 0.8 });
+            const arenaFloor = new THREE.Mesh(floorGeo, floorMat);
+            arenaFloor.position.y = -0.6;
+            scene.add(arenaFloor);
+
+            window.addEventListener('resize', () => {
+                const w = canvasContainer.clientWidth;
+                renderer.setSize(w, w * (10/16));
+                camera.aspect = 16/10;
+                camera.updateProjectionMatrix();
+            });
+        }
+
+        function initNewGame() {
+            enemies.forEach(e => scene.remove(e.mesh));
+            projectiles.forEach(p => scene.remove(p.mesh));
+            particles.forEach(pt => scene.remove(pt.mesh));
+            if (playerObj) scene.remove(playerObj);
+
+            enemies = []; projectiles = []; particles = [];
+            score = 0; currentWave = 1; playerHealth = 100;
+            gameActive = true;
+
+            const pGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+            const pMat = new THREE.MeshStandardMaterial({ color: 0x3effbe, roughness: 0.2, emissive: 0x11aa77 });
+            playerObj = new THREE.Mesh(pGeo, pMat);
+            playerObj.position.set(0, 0.1, 0);
+            scene.add(playerObj);
+
+            updateUIElements();
+            runWaveSpawningLogic();
+            renderFrameLoop();
+        }
+
+        function updateUIElements() {
+            waveDisplay.textContent = currentWave;
+            healthDisplay.textContent = Math.max(0, playerHealth);
+            scoreDisplay.textContent = score;
+        }
+
+        function fireProjectile() {
+            raycaster.setFromCamera(pointer2D, camera);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(planeTarget, intersectPoint);
+            
